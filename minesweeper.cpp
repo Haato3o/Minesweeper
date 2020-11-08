@@ -19,6 +19,7 @@ struct Slot
 	wchar_t Character;
 	bool IsBomb;
 	bool IsShown;
+	bool IsFlagged;
 };
 
 void recursive_check_bounds(Slot* map, int posX, int posY, int mWidth, int mHeight)
@@ -110,6 +111,7 @@ Slot* generate_map(int nBombs, int mWidth, int mHeight)
 		map[i].Character = L' ';
 		map[i].IsBomb = false;
 		map[i].IsShown = false;
+		map[i].IsFlagged = false;
 	}
 
 	for (int bomb = 0; bomb < nBombs; bomb++)
@@ -195,6 +197,8 @@ Slot* generate_map(int nBombs, int mWidth, int mHeight)
 
 int main()
 {
+	srand(time(0));
+
 	// Creates screen buffer
 	wchar_t* screen = (wchar_t*)malloc(ScreenWidth * ScreenHeight * sizeof(wchar_t));
 
@@ -226,7 +230,9 @@ int main()
 	COORD mPosition{};
 	bool IsLeftButtonPressed;
 	bool IsRightButtonPressed;
-
+	int nScore = 0;
+	int nBombsLeft = 0;
+	int nFlagsLeft = mNumberBombs;
 	bool bGameOver = false;
 
 	while (!bGameOver)
@@ -261,12 +267,6 @@ int main()
 				}
 			}
 		}
-		/*
-		if (GetConsoleScreenBufferInfo(hConsole, &lpConsoleScreenBufferInfo))
-		{
-			mPosition = lpConsoleScreenBufferInfo.dwCursorPosition;
-			swprintf_s(screen, 16, L"%d %d", mPosition.X, mPosition.Y);
-		}*/
 		
 		// Draw map
 		for (int x = 0; x < mMapWidth; x++)
@@ -280,7 +280,7 @@ int main()
 
 				if (!currentSlot.IsShown)
 				{
-					screen[posScreen] = HIDDEN_ICON;
+					screen[posScreen] = currentSlot.IsFlagged ? FLAG_ICON : HIDDEN_ICON;
 				} else
 				{
 					screen[posScreen] = currentSlot.Character;
@@ -298,9 +298,22 @@ int main()
 			} else if (!mineMap[position].IsBomb)
 			{
 				mineMap[position].IsShown = true;
+			} else if (mineMap[position].IsBomb)
+			{
+				bGameOver = true;
 			}
-			
 		}
+
+		if (IsRightButtonPressed && nFlagsLeft > 0 && screen[mPosition.Y * ScreenWidth + mPosition.X] != WALL_ICON)
+		{
+			int position = (mPosition.Y - 2) * mMapWidth + (mPosition.X - 2);
+
+			mineMap[position].IsFlagged = !mineMap[position].IsFlagged;
+			nFlagsLeft -= mineMap[position].IsFlagged ? 1 : -1;
+		}
+		
+		swprintf_s(&screen[0], 16, L"Score: %8d", nScore);
+		swprintf_s(&screen[1 * ScreenWidth + 0], 11, L"Flags: %3d", nFlagsLeft);
 
 		WriteConsoleOutputCharacter(hConsole, screen, ScreenWidth * ScreenHeight, { 0, 0 }, &dwBytesWritten);
 	}
